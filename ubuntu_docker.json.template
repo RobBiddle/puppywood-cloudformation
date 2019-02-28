@@ -1,0 +1,164 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "This template deploys a Linux server for docker",
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Import Existing Stack Outputs"
+                    },
+                    "Parameters": [
+                        "EIPStackName",
+                        "NetworkStackName",
+                        "SecurityGroupStackName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "EC2 Instance"
+                    },
+                    "Parameters": [
+                        "AMIid",
+                        "EC2InstanceType",
+                        "KeyPairName",
+                        "ServerHostname"
+                    ]
+                }
+            ]
+        }
+    },
+    "Mappings": {},
+    "Parameters": {
+        "AMIid": {
+            "Description": "Enter the AMI ID to use for this system",
+            "Type": "String"
+        },
+        "EIPStackName": {
+            "Description": "Name of an active CloudFormation stack that contains the EIP resources that will be used in this stack.",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 255,
+            "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+            "Default": "EIP-ServerName"
+        },
+        "NetworkStackName": {
+            "Description": "Name of an active CloudFormation stack that contains the Network resources that will be used in this stack.",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 255,
+            "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+            "Default": "NetworkStack"
+        },
+        "SecurityGroupStackName": {
+            "Description": "Name of an active CloudFormation stack that contains the Security Group resources that will be used in this stack.",
+            "Type": "String",
+            "MinLength": 1,
+            "MaxLength": 255,
+            "AllowedPattern": "^[a-zA-Z][-a-zA-Z0-9]*$",
+            "Default": "SecurityGroups"
+        },
+        "KeyPairName": {
+            "Description": "Public/private key pairs allow you to securely connect to your instance after it launches",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "ServerHostname": {
+            "Description": "ADM#",
+            "Type": "String"
+        },
+        "EC2InstanceType": {
+            "Description": "Amazon EC2 instance type for the Linux Instances",
+            "Type": "String",
+            "Default": "t3.micro",
+            "AllowedValues": [
+                "t2.nano",
+                "t2.micro",
+                "t2.small",
+                "t2.medium",
+                "t2.large",
+                "t2.xlarge",
+                "t3.nano",
+                "t3.micro",
+                "t3.small",
+                "t3.medium",
+                "t3.large",
+                "t3.xlarge",
+                "t3.2xlarge"
+            ]
+        }
+    },
+    "Resources": {
+        "EC2Instance": {
+            "Type": "AWS::EC2::Instance",
+            "Metadata": {
+                "Comment1": "Configure the bootstrap helpers to install the Apache Web Server and PHP",
+                "Comment2": "Save website content to /var/www/html/index.php",
+                "AWS::CloudFormation::Init": {}
+            },
+            "Properties": {
+                "ImageId": {
+                    "Ref": "AMIid"
+                },
+                "InstanceType": {
+                    "Ref": "EC2InstanceType"
+                },
+                "SubnetId": {
+                    "Fn::ImportValue": {
+                        "Fn::Sub": "${NetworkStackName}-PublicSubnet1ID"
+                    }
+                },
+                "Tags": [
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::Sub": "${ServerHostname}"
+                        }
+                    }
+                ],
+                "SecurityGroupIds": [
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${SecurityGroupStackName}-WebServerSecurityGroup"
+                        }
+                    },
+                    {
+                        "Fn::ImportValue": {
+                            "Fn::Sub": "${SecurityGroupStackName}-SecureShellSecurityGroup"
+                        }
+                    }
+                ],
+                "KeyName": {
+                    "Ref": "KeyPairName"
+                },
+                "UserData": {
+                    "Fn::Base64": {
+                        "Fn::Join": [
+                            "",
+                            [
+                                "#!/bin/bash -xe\n",
+                                "curl -fsSL https://raw.githubusercontent.com/RobBiddle/puppywood-docker/master/bootstrap.sh -o bootstrap.sh\n",
+                                "sudo chmod +x /bootstrap.sh",
+                                "sudo sh bootstrap.sh \n"
+                            ]
+                        ]
+                    }
+                }
+            }
+        },
+        "EC2EIPAssociation": {
+            "DependsOn": "EC2Instance",
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::ImportValue": {
+                        "Fn::Sub": "${EIPStackName}-AllocationId"
+                    }
+                },
+                "InstanceId": {
+                    "Ref": "EC2Instance"
+                }
+            }
+        }
+    },
+    "Outputs": {}
+}

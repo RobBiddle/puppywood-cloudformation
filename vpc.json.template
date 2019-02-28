@@ -1,0 +1,424 @@
+{
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Description": "Creates a VPC network for puppywood.com",
+    "Mappings": {
+        "Map1": {
+            "Map1Values": {
+                "DomainDNSName": "puppywood.com",
+                "PrivateSubnet1CIDR": "172.16.1.0/24",
+                "PublicSubnet1CIDR": "172.16.2.0/24",
+                "VPCCIDR": "172.16.0.0/16"
+            }
+        }
+    },
+    "Resources": {
+        "DHCPOptions": {
+            "Type": "AWS::EC2::DHCPOptions",
+            "Properties": {
+                "DomainName": {
+                    "Fn::FindInMap": [
+                        "Map1",
+                        "Map1Values",
+                        "DomainDNSName"
+                    ]
+                },
+                "DomainNameServers": [
+                    "AmazonProvidedDNS"
+                ]
+            }
+        },
+        "VPC": {
+            "Type": "AWS::EC2::VPC",
+            "Properties": {
+                "CidrBlock": {
+                    "Fn::FindInMap": [
+                        "Map1",
+                        "Map1Values",
+                        "VPCCIDR"
+                    ]
+                },
+                "EnableDnsSupport": "true",
+                "EnableDnsHostnames": "true",
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": {
+                            "Fn::FindInMap": [
+                                "Map1",
+                                "Map1Values",
+                                "DomainDNSName"
+                            ]
+                        }
+                    }
+                ]
+            }
+        },
+        "VPCDHCPOptionsAssociation": {
+            "Type": "AWS::EC2::VPCDHCPOptionsAssociation",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "DhcpOptionsId": {
+                    "Ref": "DHCPOptions"
+                }
+            }
+        },
+        "PublicSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Fn::FindInMap": [
+                        "Map1",
+                        "Map1Values",
+                        "PublicSubnet1CIDR"
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "DMZ 1 Subnet"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "PublicSubnet1"
+                    }
+                ]
+            }
+        },
+        "PrivateSubnet1": {
+            "Type": "AWS::EC2::Subnet",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "CidrBlock": {
+                    "Fn::FindInMap": [
+                        "Map1",
+                        "Map1Values",
+                        "PrivateSubnet1CIDR"
+                    ]
+                },
+                "AvailabilityZone": {
+                    "Fn::Select": [
+                        0,
+                        {
+                            "Fn::GetAZs": ""
+                        }
+                    ]
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Private"
+                    },
+                    {
+                        "Key": "Role",
+                        "Value": "AZ1 Subnet"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "PrivateSubnet1"
+                    }
+                ]
+            }
+        },
+        "InternetGateway": {
+            "Type": "AWS::EC2::InternetGateway",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "Public"
+                    }
+                ]
+            }
+        },
+        "VPCGatewayAttachment": {
+            "Type": "AWS::EC2::VPCGatewayAttachment",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "InternetGatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PublicRouteTable": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "DMZ"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "Public RouteTable"
+                    }
+                ]
+            }
+        },
+        "PublicRoute": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "GatewayId": {
+                    "Ref": "InternetGateway"
+                }
+            }
+        },
+        "PublicSubnetRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PublicRouteTable"
+                }
+            }
+        },
+        "PrivateRouteTable1": {
+            "Type": "AWS::EC2::RouteTable",
+            "Properties": {
+                "VpcId": {
+                    "Ref": "VPC"
+                },
+                "Tags": [
+                    {
+                        "Key": "Application",
+                        "Value": {
+                            "Ref": "AWS::StackName"
+                        }
+                    },
+                    {
+                        "Key": "Network",
+                        "Value": "AZ1 Private"
+                    },
+                    {
+                        "Key": "Name",
+                        "Value": "PrivateSubnet1 RouteTable"
+                    }
+                ]
+            }
+        },
+        "PrivateRoute1": {
+            "Type": "AWS::EC2::Route",
+            "Properties": {
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable1"
+                },
+                "DestinationCidrBlock": "0.0.0.0/0",
+                "NatGatewayId": {
+                    "Ref": "NATGateway1"
+                }
+            }
+        },
+        "PrivateSubnetRouteTableAssociation1": {
+            "Type": "AWS::EC2::SubnetRouteTableAssociation",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "PrivateSubnet1"
+                },
+                "RouteTableId": {
+                    "Ref": "PrivateRouteTable1"
+                }
+            }
+        },
+        "NATGateway1EIP": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "NATGateway1": {
+            "DependsOn": "VPCGatewayAttachment",
+            "Type": "AWS::EC2::NatGateway",
+            "Properties": {
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "NATGateway1EIP",
+                        "AllocationId"
+                    ]
+                },
+                "SubnetId": {
+                    "Ref": "PublicSubnet1"
+                }
+            }
+        }
+    },
+    "Outputs": {
+        "VPCID": {
+            "Value": {
+                "Ref": "VPC"
+            },
+            "Description": "VPC ID",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-VPCID"
+                }
+            }
+        },
+        "NetworkDnsDomain": {
+            "Value": {
+                "Fn::FindInMap": [
+                    "Map1",
+                    "Map1Values",
+                    "DomainDNSName"
+                ]
+            },
+            "Description": "Network DNS Domain",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-NetworkDnsDomain"
+                }
+            }
+        },
+        "VPCCIDR": {
+            "Value": {
+                "Fn::FindInMap": [
+                    "Map1",
+                    "Map1Values",
+                    "VPCCIDR"
+                ]
+            },
+            "Description": "VPC CIDR",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-VPCCIDR"
+                }
+            }
+        },
+        "PrivateSubnet1CIDR": {
+            "Value": {
+                "Fn::FindInMap": [
+                    "Map1",
+                    "Map1Values",
+                    "PrivateSubnet1CIDR"
+                ]
+            },
+            "Description": "PrivateSubnet1 CIDR",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PrivateSubnet1CIDR"
+                }
+            }
+        },
+        "PublicSubnet1CIDR": {
+            "Value": {
+                "Fn::FindInMap": [
+                    "Map1",
+                    "Map1Values",
+                    "PublicSubnet1CIDR"
+                ]
+            },
+            "Description": "PublicSubnet1 CIDR",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PublicSubnet1CIDR"
+                }
+            }
+        },
+        "PublicSubnet1ID": {
+            "Value": {
+                "Ref": "PublicSubnet1"
+            },
+            "Description": "Public Subnet ID in AZ1",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PublicSubnet1ID"
+                }
+            }
+        },
+        "PrivateSubnet1ID": {
+            "Value": {
+                "Ref": "PrivateSubnet1"
+            },
+            "Description": "Private Subnet ID in AZ1",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PrivateSubnet1ID"
+                }
+            }
+        },
+        "PrivateRouteTable1": {
+            "Value": {
+                "Ref": "PrivateRouteTable1"
+            },
+            "Description": "PrivateRouteTable1",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PrivateRouteTable1"
+                }
+            }
+        },
+        "PublicRouteTable": {
+            "Value": {
+                "Ref": "PublicRouteTable"
+            },
+            "Description": "PublicRouteTable",
+            "Export": {
+                "Name": {
+                    "Fn::Sub": "${AWS::StackName}-PublicRouteTable"
+                }
+            }
+        }
+    }
+}
