@@ -68,6 +68,12 @@
                         "CidrIp": "0.0.0.0/0"
                     },
                     {
+                        "IpProtocol": "tcp",
+                        "FromPort": "8081",
+                        "ToPort": "8081",
+                        "CidrIp": "0.0.0.0/0"
+                    },
+                    {
                         "IpProtocol": "icmp",
                         "FromPort": "-1",
                         "ToPort": "-1",
